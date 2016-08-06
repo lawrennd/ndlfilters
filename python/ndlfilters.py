@@ -91,13 +91,15 @@ def MakeUppercase(key, val, fmt,meta):
             return Str(M)
 
 def only(key, val, fmt,meta):
+    """This doesn't work yet, because it looks like it terminates the leaf before the backets are picked up, i.e. it is \only then the next leaf is <1>. Presume similar for includegraphics."""
     if key == 'RawInline':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\only", code):
-            sys.stderr.write('Found only')
-            match_macro = re.compile(r"""\\only<(.*)>\{(.*)\}""")
+            match_macro = re.compile(r"""\\only<(.*)>\{(.*)\}""", re.DOTALL)
             macro_match = match_macro.findall(code)
+            
             for m in macro_match:
+                sys.stderr.write(m)
                 return Para(m[1] + ' ' + m[0])
 
 def includetalkfile(key, val, fmt, meta):
