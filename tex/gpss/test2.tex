@@ -1,0 +1,254 @@
+% test with
+% pandoc -R -f latex test2.tex -F ../../myfilter.py -t markdown -o test2.md
+
+%\documentclass[serif, mathserif, professionalfont]{beamer}
+\usetheme{BlueGrey}
+\usenavigationsymbolstemplate{}
+
+\setlength{\parskip}{1em}
+
+% package includes
+
+% Bibliography
+\usepackage{natbib}
+
+% maths
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% fonts
+\usepackage{bm}
+\usepackage{pxfonts}
+\usepackage{palatino}
+
+% programming
+\usepackage{listings}
+
+% multimedia and drawing
+\usepackage{multimedia}
+\usepackage{xmpmulti}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{media9}
+\usepackage{animate}
+\usepackage{pgf}
+
+% layout
+\usepackage{relsize}
+\usepackage{setspace}
+\usepackage{multirow}
+\usepackage{textpos}
+
+\input{notation_def.tex}
+\input{definitions.tex}
+\input{graphicalModels.tex}
+\input{people.tex}
+
+%\global\long\def\newsection#1#2{\title{#1}\frame{\maketitle}\section{#1}\begin{frame}\frametitle{Outline}\tableofcontents[currentsection,hideallsubsections]\end{frame}\begin{frame}\frametitle{Outline}\tableofcontents[currentsection,hideothersubsections]\end{frame}\includetalkfile{#2}}
+
+
+
+\global\long\def\inputVals{\inputVector}
+%\global\long\def\blackBackground{}
+\global\long\def\includetalkfile#1{\input{#1}}
+\newcommand{\rbfKernel}{EQ}
+\newcommand{\rbfKernelLong}{exponentiated quadratic}
+
+\begin{document}
+
+\title[Gaussian Processes]{Introduction to Gaussian Processes}
+
+\author[Lawrence]{Neil D. Lawrence}
+\titlegraphic{\href{http://gpss.cc}{\includegraphics[width=2cm]{../../../gp/tex/diagrams/logo}}}
+
+\date[MLSS 2016]{MLSS, Arequipa, Peru\\
+2nd August 2016}
+
+\frame{\maketitle}
+\begin{frame}
+  \frametitle{Outline}
+
+  \tableofcontents[hideallsubsections] 
+
+\end{frame}
+\newsection{Gaussian Processes}{../../../gp/tex/talks/gpbook.tex}
+\input{../../../gp/tex/talks/overdeterminedGp.tex}
+\input{../../../gp/tex/talks/underdeterminedGp.tex}
+\begin{frame}
+  \frametitle{Gaussian Process}
+  \[
+  \dataScalar_i(\inputVector_i) = \mappingFunction(\inputVector_i) + \noiseScalar_i
+  \]
+  \begin{itemize}
+  \item Place a prior over the process as well as the noise.
+  \item Leads to models that are not i.i.d.
+    \item Contrast with classical model's objective function:
+    \[
+    \sum_{i=1}^n (1 - y_i(\mappingVector^\top\inputVector_i - b))_{+} + \lambda \mappingVector^\top\mappingVector
+    \]
+  \end{itemize}
+\end{frame}
+\begin{frame}
+  \frametitle{Model and Algorithm}
+  \begin{itemize}
+  \item I'm keen on the idea of a conceptual separation model and algorithm.
+  \item Model is how you encode the regularities of the universe.
+  \item Algorithm is how you combine that model with data.
+    \[
+    \text{data} + \text{model} \rightarrow \text{prediction}
+    \]
+    \item Of course often we are restricted in modeling choice due to lack of algorithms.
+  \end{itemize}
+\end{frame}
+    
+
+\newsubsection{Distributions over Functions}{../../../gp/tex/talks/gp_extremely_short.tex}
+\includetalkfile{../../../gp/tex/talks/gpdistfunc}
+%\includetalkfile{../../../gp/tex/talks/gpTwoPointIntro}
+\newsubsection{Two Point Marginals}{../../../gp/tex/talks/gptwopointpred}
+
+\includetalkfile{../../../kern/tex/talks/rbfcovariance}
+\includetalkfile{../../../kern/tex/talks/computingRbfCovariance}
+
+\includetalkfile{../../../gp/tex/talks/gpInterpolation.tex}
+\begin{frame}
+  \frametitle{Gaussian Noise}
+  \begin{itemize}
+  \item Gaussian noise model, 
+    \[
+    p\left(\dataScalar_{i}|\mappingFunction_{i}\right) = \gaussianDist{\dataScalar_{i}}{\mappingFunction_{i}}{\dataStd^2}
+    \]
+    where $\dataStd^2$ is the variance of the noise.
+    \item Equivalent to a covariance function of the form
+    \[
+    \kernelScalar(\inputVals_i, \inputVals_j) = \delta_{i, j}\dataStd^2
+    \]
+    where $\delta_{i,j}$ is the Kronecker delta function.
+    \item Additive nature of Gaussians means we can simply add this term to existing covariance matrices.                       
+  \end{itemize}
+\end{frame}
+
+\newsubsection{GP Regression}{../../../gp/tex/talks/gpregression.tex}
+\includetalkfile{../../../ml/tex/talks/olympicMarathonGpFit.tex}
+\newsection{GP Non-Gaussian}{../../../gp/tex/talks/gpNoiseModels.tex}
+
+\includetalkfile{../../../gp/tex/talks/gpoptimize.tex}
+
+
+
+\newsection{Parametric Models are a Bottleneck}{../../../gp/tex/talks/bottleneck.tex}
+
+
+\includetalkfile{../../../gp/tex/talks/mercer.tex}
+
+
+% \input{../../../kern/tex/talks/rbfcovariance}
+
+
+\newsubsection{Covariance Functions}{../../../gp/tex/talks/basisFunctions.tex}
+%\includetalkfile{../../../gp/tex/talks/multivariateGaussianProperties.tex}
+\includetalkfile{../../../kern/tex/talks/rbfbasiscovariance.tex}
+
+\newsubsection{Multivariate Gaussian Properties}{../../../gp/tex/talks/multivariateGaussianProperties.tex}
+\newsubsection{An Infinite Basis}{../../../gp/tex/talks/infiniteBasis.tex}
+\includetalkfile{../../../kern/tex/talks/rbfbasiscovariance.tex}
+\includetalkfile{../../../kern/tex/talks/rbfcovariance.tex}
+\includetalkfile{../../../kern/tex/talks/mlpcovariance.tex}
+\newsubsection{Constructing Covariance Functions}{../../../gp/tex/talks/constructingCovariance}
+
+\newsubsection{Bochner's Theorem}{../../../gp/tex/talks/bochnerTheorem.tex}
+\includetalkfile{../../../kern/tex/talks/oucovariance.tex}
+\includetalkfile{../../../kern/tex/talks/matern32covariance.tex}
+\includetalkfile{../../../kern/tex/talks/matern52covariance.tex}
+\includetalkfile{../../../kern/tex/talks/rbfcovariance.tex}
+
+%\input{../../../kern/tex/talks/covfuncSamples}
+\includetalkfile{../../../kern/tex/talks/mlpcovariance}
+\includetalkfile{../../../kern/tex/talks/lincovariance}
+
+
+\newsection{GP Limitations}{../../../gp/tex/talks/gpLimitations}
+%\newsubsection{Gaussian Process Review}{../../../gp/tex/talks/gpreview_verylong
+
+% \section{Conclusions}
+
+
+% % \subsection{Summary}
+
+% % \begin{frame}
+% %   \frametitle{Summary}
+% %   \begin{itemize}
+% %   \item Broad introduction to Gaussian processes.
+% %     \begin{itemize}
+% %     \item Started with Gaussian distribution.
+% %     \item Motivated Gaussian processes through the multivariate density.
+% %     \end{itemize}
+% %   \item Emphasized the role of the covariance (not the mean).
+% %   \item Performs nonlinear regression with error bars.
+% %   \item Parameters of the covariance function (kernel) are easily
+% %     optimized with maximum likelihood.
+% %   \end{itemize}
+% % \end{frame}
+
+\newsection{Kalman Filter}{../../../kern/tex/talks/markovDerivation}
+\input{../../../kern/tex/talks/markovcovariance}
+\input{../../../kern/tex/talks/markovprecision}
+\input{../../../kern/tex/talks/rbfcovariance}
+\input{../../../kern/tex/talks/rbfprecision}
+\input{../../../kern/tex/talks/markovprecision}
+\input{../../../gp/tex/talks/gpKalmanFilterKronecker}
+\input{../../../multigp/tex/talks/gpKalmanToMultiTask}
+
+
+
+\newsection{Dimensionality Reduction}{../../../dimred/tex/talks/sixexample.tex}
+\newsubsection{Existing Methodologies}{../../../gplvm/tex/talks/existingMethodologies.tex}
+\includetalkfile{../../../gplvm/tex/talks/notation.tex}
+\newsubsection{Dual Probabilistic PCA}{../../../gplvm/tex/talks/dppca.tex}
+
+\global\long\def\inputVals{\latentVector}
+%\newsubsection{Gaussian Processes}{../../../gp/tex/talks/gpdistfunc.tex}
+%\input{../../../gp/tex/talks/covfunctions.tex}
+\newsubsection{Nonlinear Latent Variable Models}{../../../gplvm/tex/talks/nonlinearLatent.tex}
+\newsubsection{Examples}{../../../gplvm/tex/talks/exampleList.tex}
+\includetalkfile{../../../gplvm/tex/talks/latentDoodleSpace.tex}
+\includetalkfile{../../../gplvm/tex/talks/gaussianFace.tex}
+\includetalkfile{../../../gplvm/tex/talks/characterControl.tex}
+
+\global\long\def\returnLabel{extensionsReturn}
+\begin{frame}[label=\returnLabel]
+  \frametitle{Other Topics}
+  \begin{itemize}
+  \item Local distance preservation \hyperlink{backconstraints}{\beamergotobutton{Details}}
+  \item Dynamical models \hyperlink{dynamics}{\beamergotobutton{Details}}
+  \item Hierarchical models \hyperlink{hierarchies}{\beamergotobutton{Details}}
+  \item Bayesian GP-LVM \hyperlink{bayesGplvm}{\beamergotobutton{Details}}
+  \end{itemize}
+
+
+\end{frame}
+\newsubsection{Back Constraints}{../../../gplvm/tex/talks/backConstraints.tex}
+\newsubsection{Dynamics}{../../../gplvm/tex/talks/dynamics.tex}
+\newsubsection{Hierarchical GP-LVM}{../../../gplvm/tex/talks/hgplvm.tex}
+\newsubsection{Bayesian GP-LVM}{../../../gplvm/tex/talks/bayesGplvmIntro.tex}
+\includetalkfile{../../../gplvm/tex/talks/variationalBayesGPLVM_long.tex}
+\includetalkfile{../../../gplvm/tex/talks/ardGplvm.tex}
+\newsubsection{Gaussian Process Dynamical Systems}{../../../gplvm/tex/talks/gpds.tex}
+\newsubsection{Shared GP-LVM}{../../../gplvm/tex/talks/mrdGplvm.tex}
+
+
+
+\begin{frame}[allowframebreaks]
+  \frametitle{References}
+
+  {\footnotesize \bibliographystyle{pdf_abbrvnat}
+    \bibliography{lawrence,other,zbooks}
+  }
+
+
+\end{frame}
+
+\appendix
+
+\end{document}

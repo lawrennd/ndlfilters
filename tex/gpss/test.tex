@@ -1,0 +1,16 @@
+% test with
+% pandoc -R -f latex test.tex -F ../../../pandoc/python/myfilter.py -t markdown -o test.md
+
+\input{notation_def}
+\includetalkfile{../../../gplvm/tex/talks/variationalBayesGPLVM_long.tex}
+\includetalkfile{../../../gp/tex/talks/gpInterpolation.tex}
+\begin{octave}
+  %}
+  rbfcovarianceSample
+  %{
+\end{octave}
+\begin{center}
+  \only<1>{\inputdiagram{../../../kern/tex/diagrams/rbfKernelImage}}\only<2>{\begin{animateinline}[autoplay,loop]{10}\input{../../../kern/tex/diagrams/rbfSampleIncludeText.tex}\end{animateinline}}
+\end{center}
+
+\only<1>{This is a test of only}
