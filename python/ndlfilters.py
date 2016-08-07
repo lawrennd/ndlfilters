@@ -4,13 +4,23 @@ import shutil
 import sys
 from subprocess import call
 from tempfile import mkdtemp
-from pandocfilters import toJSONFilters, Para, Image, get_filename4code, get_extension, walk, CodeBlock
+from pandocfilters import toJSONFilters, Para, Image, get_filename4code, get_extension, walk, CodeBlock, Link, Str
 from caps import caps
 import pypandoc as pd
 import json
 
 filters = ['../../../pandoc/python/myfilter.py']#, 'pandoc-citeproc']
-pdoc_args = ['--mathjax', '--smart']#, '--parse-raw']
+pdoc_args = ['--mathjax', '--smart', '--parse-raw']
+
+
+def decamel(name):
+    """Remove camel case from a string"""
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+def get_filename(source):
+    """Generate the file name given directory and source file."""
+    pass
 
 def octave2file(octave_src, outfile):
     #tmpdir = mkdtemp()
@@ -21,6 +31,7 @@ def octave2file(octave_src, outfile):
     f.close()
 
 def tikz2image(tikz_src, filetype, outfile):
+    """Create an image from a tikz file"""
     tmpdir = mkdtemp()
     olddir = os.getcwd()
     os.chdir(tmpdir)
@@ -71,7 +82,13 @@ def inputdiagram(key, val, fmt, meta):
     if key == 'RawInline':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\inputdiagram", code):
-            outfile = get_filename4code("inputdiagram", code)
+            #outfile = get_filename4code("inputdiagram", code)
+            match_macro = re.compile(r"""\\inputdiagram\{(.*)\}""")
+            macro_match = match_macro.findall(code)
+            for m in macro_match:
+                fullfile = m
+                outfile = os.path.splitext(fullfile)[0]
+
             filetype = get_extension(format, "png", html="png", latex="pdf")
             src = outfile + '.' + filetype
             if not os.path.isfile(src):
@@ -90,17 +107,6 @@ def MakeUppercase(key, val, fmt,meta):
                 M = caps(val, fmt, meta)
             return Str(M)
 
-def only(key, val, fmt,meta):
-    """This doesn't work yet, because it looks like it terminates the leaf before the backets are picked up, i.e. it is \only then the next leaf is <1>. Presume similar for includegraphics."""
-    if key == 'RawInline':
-        [fmt, code] = val
-        if fmt == "latex" and re.match(r"\\only", code):
-            match_macro = re.compile(r"""\\only<(.*)>\{(.*)\}""", re.DOTALL)
-            macro_match = match_macro.findall(code)
-            
-            for m in macro_match:
-                sys.stderr.write(m)
-                return Para(m[1] + ' ' + m[0])
 
 def includetalkfile(key, val, fmt, meta):
     "Deal with included talk files."
@@ -122,25 +128,68 @@ def includetalkfile(key, val, fmt, meta):
                           '--from=latex',
                           '--output=' + outputfile],
                          stdout=sys.stderr)
+                    return Link(['', [], []], [Str(f)], [outputfile, ""])
+                        
 
-def frame(key, val, fmt, meta):
-    if key == 'RawBlock':
-        [fmt, code] = val
-        if fmt == "latex":
-            if re.match(r"\\begin{frame}", code):
-                match_macro = re.compile(r"""\\begin{frame}(.*)\\end{frame}""", re.DOTALL)
-                macro_match = match_macro.findall(code)
-                for m in macro_match:
-                    frame_text = '\input{notation_def.tex}\n\hline' + m + '\hline'
-                    output=pd.convert_text(source=frame_text,
-                                           to='json',
-                                           format='latex',
-                                           extra_args=pdoc_args,
-                                           filters=filters)
-                    return json.loads(output)[1]
 
+def environment_replace(name, preamble='\input{notation_def.tex}'):
+    """Process a latex environment."""
+    def fun(key, val, fmt, meta):
+        if key == 'RawBlock':
+            [fmt, code] = val
+            if fmt == "latex":
+                if re.match(r"\\begin{{{name}}}".format(name=name), code):
+                    match_macro = re.compile(r"""\\begin{{{name}}}(.*)\\end{{{name}}}""".format(name=name), re.DOTALL)
+                    macro_match = match_macro.findall(code)
+                    for m in macro_match:
+                        body = m
+                        environment_text = '{preamble}\n\n {name} start\n\n {body}\n\n {name} end'.format(preamble=preamble, name=name, body=body)
+                        output=pd.convert_text(source=environment_text,
+                                               to='json',
+                                               format='latex',
+                                               extra_args=pdoc_args,
+                                               filters=filters)
+                        return json.loads(output)[1]
+    return fun
+
+
+overprint = environment_replace('overprint')
+columns = environment_replace('columns')
+frame = environment_replace('frame')
+animateinline = environment_replace('animateinline')
+
+def command_replace(name, replace='{name} {body}'):
+    """Process a latex environment."""
+    def fun(key, val, fmt, meta):
+        if key == 'RawInline':
+            [fmt, code] = val
+            if fmt == "latex":
+                if re.match(r"\\{name}".format(name=name), code):
+                    match_macro = re.compile(r"""\\{name}{{(.*)}}""".format(name=name), re.DOTALL)
+                    macro_match = match_macro.findall(code)
+                    for m in macro_match:
+                        body = m
+                        command_text = replace.format(name=name, body=body)
+                        return Str(command_text)
+    return fun
+
+column = command_replace('column', replace='{{{name} width={body}}}')
+only = command_replace('only', replace='{{{name} slideno={body}}}')
+onslide = command_replace('onslide', replace='{{{name} slideno={body}}}')
+
+def overlay(key, value, fmt, meta):
+    "From https://andrewgoldstone.com/blog/2014/12/24/slides/"
+    if key == 'RawInline' and value[0] == 'tex':
+        m = ov_pat.match(value[1])
+        if m:
+            c = m.group(1)
+            c += re.sub(r'^\{|}$', "", m.group(2))
+            c += m.group(3)
+            return RawInline("tex", c)
+
+                
 def octave(key, val, fmt, meta):
-
+    """Write an octave block to a new file."""
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\begin{octave}", code):

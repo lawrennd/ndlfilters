@@ -45,13 +45,11 @@
 \input{graphicalModels.tex}
 \input{people.tex}
 
-%\global\long\def\newsection#1#2{\title{#1}\frame{\maketitle}\section{#1}\begin{frame}\frametitle{Outline}\tableofcontents[currentsection,hideallsubsections]\end{frame}\begin{frame}\frametitle{Outline}\tableofcontents[currentsection,hideothersubsections]\end{frame}\includetalkfile{#2}}
 
 
 
-\global\long\def\inputVals{\inputVector}
+\newcommand{\inputVals}{\inputVector}
 %\global\long\def\blackBackground{}
-\global\long\def\includetalkfile#1{\input{#1}}
 \newcommand{\rbfKernel}{EQ}
 \newcommand{\rbfKernelLong}{exponentiated quadratic}
 
@@ -73,8 +71,8 @@
 
 \end{frame}
 \newsection{Gaussian Processes}{../../../gp/tex/talks/gpbook.tex}
-\input{../../../gp/tex/talks/overdeterminedGp.tex}
-\input{../../../gp/tex/talks/underdeterminedGp.tex}
+\includetalkfile{../../../gp/tex/talks/overdeterminedGp.tex}
+\includetalkfile{../../../gp/tex/talks/underdeterminedGp.tex}
 \begin{frame}
   \frametitle{Gaussian Process}
   \[
@@ -143,7 +141,7 @@
 \includetalkfile{../../../gp/tex/talks/mercer.tex}
 
 
-% \input{../../../kern/tex/talks/rbfcovariance}
+% \includetalkfile{../../../kern/tex/talks/rbfcovariance}
 
 
 \newsubsection{Covariance Functions}{../../../gp/tex/talks/basisFunctions.tex}
@@ -163,7 +161,7 @@
 \includetalkfile{../../../kern/tex/talks/matern52covariance.tex}
 \includetalkfile{../../../kern/tex/talks/rbfcovariance.tex}
 
-%\input{../../../kern/tex/talks/covfuncSamples}
+%\includetalkfile{../../../kern/tex/talks/covfuncSamples}
 \includetalkfile{../../../kern/tex/talks/mlpcovariance}
 \includetalkfile{../../../kern/tex/talks/lincovariance}
 
@@ -192,13 +190,13 @@
 % % \end{frame}
 
 \newsection{Kalman Filter}{../../../kern/tex/talks/markovDerivation}
-\input{../../../kern/tex/talks/markovcovariance}
-\input{../../../kern/tex/talks/markovprecision}
-\input{../../../kern/tex/talks/rbfcovariance}
-\input{../../../kern/tex/talks/rbfprecision}
-\input{../../../kern/tex/talks/markovprecision}
-\input{../../../gp/tex/talks/gpKalmanFilterKronecker}
-\input{../../../multigp/tex/talks/gpKalmanToMultiTask}
+\includetalkfile{../../../kern/tex/talks/markovcovariance}
+\includetalkfile{../../../kern/tex/talks/markovprecision}
+\includetalkfile{../../../kern/tex/talks/rbfcovariance}
+\includetalkfile{../../../kern/tex/talks/rbfprecision}
+\includetalkfile{../../../kern/tex/talks/markovprecision}
+\includetalkfile{../../../gp/tex/talks/gpKalmanFilterKronecker}
+\includetalkfile{../../../multigp/tex/talks/gpKalmanToMultiTask}
 
 
 
@@ -207,7 +205,7 @@
 \includetalkfile{../../../gplvm/tex/talks/notation.tex}
 \newsubsection{Dual Probabilistic PCA}{../../../gplvm/tex/talks/dppca.tex}
 
-\global\long\def\inputVals{\latentVector}
+\newcommand{\inputVals}{\latentVector}
 %\newsubsection{Gaussian Processes}{../../../gp/tex/talks/gpdistfunc.tex}
 %\input{../../../gp/tex/talks/covfunctions.tex}
 \newsubsection{Nonlinear Latent Variable Models}{../../../gplvm/tex/talks/nonlinearLatent.tex}
@@ -216,7 +214,7 @@
 \includetalkfile{../../../gplvm/tex/talks/gaussianFace.tex}
 \includetalkfile{../../../gplvm/tex/talks/characterControl.tex}
 
-\global\long\def\returnLabel{extensionsReturn}
+\newcommand{\returnLabel}{extensionsReturn}
 \begin{frame}[label=\returnLabel]
   \frametitle{Other Topics}
   \begin{itemize}
@@ -225,8 +223,6 @@
   \item Hierarchical models \hyperlink{hierarchies}{\beamergotobutton{Details}}
   \item Bayesian GP-LVM \hyperlink{bayesGplvm}{\beamergotobutton{Details}}
   \end{itemize}
-
-
 \end{frame}
 \newsubsection{Back Constraints}{../../../gplvm/tex/talks/backConstraints.tex}
 \newsubsection{Dynamics}{../../../gplvm/tex/talks/dynamics.tex}
