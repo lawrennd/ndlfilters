@@ -2,7 +2,10 @@ import unittest
 import json
 import pandocfilters
 import pypandoc as pd
+import os
 
+path = os.path.dirname(os.path.realpath(__file__))
+filters = [os.path.join(path, '..', 'myfilter.py')]#, 'pandoc-citeproc']
 
 filter_test = [{'name': 'animateinline',
               'test_text': '''\\begin{animateinline}[autoplay,loop]{10}
@@ -39,7 +42,7 @@ There was a cat, I like it.
 \\only<3>{Only 3}
 \\end{frame}'''}]
 
-def gtf_(name, test_text, arg=None, format='latex', extra_args=['-R'], filters=['../../../pandoc/python/myfilter.py']):
+def gtf_(name, test_text, arg=None, format='latex', extra_args=['-R'], filters=filters):
     def test_function(self):
         if arg is None:
             tester = FilterTester(test_text, format, extra_args, filters)

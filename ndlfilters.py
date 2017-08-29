@@ -8,9 +8,9 @@ from pandocfilters import toJSONFilters, Para,RawBlock, RawInline, Plain, Image,
 from caps import caps
 import pypandoc as pd
 import json
-import pdb
 
-filters = ['../../../pandoc/python/myfilter.py']#, 'pandoc-citeproc']
+path = os.path.dirname(os.path.realpath(__file__))
+filters = [os.path.join(path, 'myfilter.py')]#, 'pandoc-citeproc']
 pdoc_args = ['--mathjax', '--smart', '--parse-raw']
 
 def latex(x):
@@ -117,7 +117,7 @@ def include_file(name, ext='.tex', docstr=None):
                             # Call pandoc again on the included file
                             call(['pandoc',
                                   '-R', body, '--to=markdown',
-                                  '--filter=../../../pandoc/python/myfilter.py',
+                                  '--filter=',','.join(filters),
                                   '--from=latex',
                                   '--output=' + outputfile],
                                  stdout=sys.stderr)
