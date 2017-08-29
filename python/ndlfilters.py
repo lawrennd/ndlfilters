@@ -4,10 +4,11 @@ import shutil
 import sys
 from subprocess import call
 from tempfile import mkdtemp
-from pandocfilters import toJSONFilters, Para, Image, get_filename4code, get_extension, walk, CodeBlock, Link, Str
+from pandocfilters import toJSONFilters, Para,RawBlock, RawInline, Plain, Image, get_filename4code, get_extension, walk, CodeBlock, Link, Str
 from caps import caps
 import pypandoc as pd
 import json
+import pdb
 
 filters = ['../../../pandoc/python/myfilter.py']#, 'pandoc-citeproc']
 pdoc_args = ['--mathjax', '--smart', '--parse-raw']
@@ -25,6 +26,7 @@ def get_filename(source):
     pass
 
 def octave2file(octave_src, outfile):
+    """Write given code to an octave file."""
     #tmpdir = mkdtemp()
     #olddir = os.getcwd()
     #os.chdir(tmpdir)
@@ -54,6 +56,7 @@ def tikz2image(tikz_src, filetype, outfile):
     shutil.rmtree(tmpdir)
 
 def picture2image(picture_src, filetype, outfile):
+    """Create an image from latex code that defines a picture."""
     tmpdir = '.'
     #tmpdir = mkdtemp()
     #olddir = os.getcwd()
@@ -86,7 +89,7 @@ def get_file(fullfile):
     dirname = os.path.dirname(fullfile)
     return os.path.join(dirname, outfile)
 
-def include_file(name, ext='.tex'):
+def include_file(name, ext='.tex', docstr=None):
     """Deal with included files."""
     def fun(key, val, fmt, meta):
         if key == 'RawInline':
@@ -111,13 +114,19 @@ def include_file(name, ext='.tex'):
                                   '--from=latex',
                                   '--output=' + outputfile],
                                  stdout=sys.stderr)
-                        return Link(['', [], []], [Str(f)], [outputfile, ""])
+                        return RawInline('tex', '#include ' + outputfile)
+                        #return Link(['', [], []], [Str(f)], [outputfile, ""])
+    fun.__name__ = name
+    if docstr is not None:
+        fun.__doc__ = docstr
+    else:
+        fun.__doc__ = "Deal with file included in " + name + " environment."
     return fun
 
                         
 def environment_replace(name,
                         preamble='\input{notation_def.tex}',
-                        template='{preamble}\n\n {name} start\n\n {body}\n\n {name} end'):
+                        template='{preamble} {body}', docstr=None):
     """Process a latex environment."""
     def fun(key, val, fmt, meta):
         if key == 'RawBlock':
@@ -134,11 +143,18 @@ def environment_replace(name,
                                                format='latex',
                                                extra_args=pdoc_args,
                                                filters=filters)
-                        return json.loads(output)[1]
+                        return [RawBlock('html', '<!--{name} start-->'.format(name=name))] + json.loads(output)['blocks'] + [RawBlock('html', '<!--{name} end-->'.format(name=name))]
+                    
+                    
+    fun.__name__ = name
+    if docstr is not None:
+        fun.__doc__ = docstr
+    else:
+        fun.__doc__ = "Process the " + name + " environment."
     return fun
 
-def command_replace(name, replace='{name} {body}'):
-    """Process a latex environment."""
+def command_replace(name, replace='{name} {body}', docstr=None):
+    """Process a latex command."""
     def fun(key, val, fmt, meta):
         if key == 'RawInline':
             [fmt, code] = val
@@ -151,20 +167,90 @@ def command_replace(name, replace='{name} {body}'):
                         body = m.group(1)
                         command_text = replace.format(name=name, body=body)
                         return Str(command_text)
+    fun.__name__ = name
+    if docstr is not None:
+        fun.__doc__ = docstr
+    else:
+        fun.__doc__ = "Process the " + name + " command."
     return fun
 
+def only(key, val, fmt, meta):
+    """Deal with beamer's \only command"""
+    if key == 'RawInline':
+        [fmt, code] = val
+        if fmt == "latex":
+            if re.match(r"\\only", code):
+                macro_pattern = re.compile(r"""\\only{?<(.*)>}?{(.*)}""", re.DOTALL)
+                m = macro_pattern.match(code)
+                if m:
+                    sys.stderr.write(str(m.group(2)))
+                    body = m.group(2)
+                    number = m.group(1)
+                    environment_text = '\input{{notation_def}}\n\n{body}'.format(body=body)
+                    sys.stderr.write(environment_text)
+                    output=pd.convert_text(source=environment_text,
+                                           to='json',
+                                           format='latex',
+                                           extra_args=pdoc_args,
+                                           filters=filters)
+                    #return [RawInline('latex', 'only slideno={number}'.format(number=number))] + json.loads(output)
+                    return json.loads(output)
+            
+
+def animateinline(key, val, fmt, meta):
+    """Handle the animateinline environment making a gif file"""
+    if key == 'RawBlock':
+        [fmt, code] = val
+        if fmt == "latex":
+            if re.match(r"\\begin{animateinline}", code):
+                macro_pattern = re.compile(r"""\\begin{animateinline}[(.*)]{(.*)}(.*)\\end{animateinline}""", re.DOTALL)
+                m = macro_pattern.match(code)
+                if m:
+                    body = m.group(3)
+                    return RawBlock("latex", body)
+
+def columns(key, val, fmt, meta):
+    """Replace Beamer columns with an html table"""
+    if key == 'RawBlock':
+        [fmt, code] = val
+        if fmt == "latex":
+            if re.match(r"\\begin{columns}", code):
+                macro_pattern = re.compile(r"""\\begin{columns}(.*)\\end{columns}""", re.DOTALL)
+                m = macro_pattern.match(code)
+                if m:
+                    body = m.group(1)
+                    preamble = '\input{notation_def.tex}\n'
+                    environment_text = '{preamble}{body}'.format(preamble=preamble, body=body)
+                    output=pd.convert_text(source=environment_text,
+                                           to='json',
+                                           format='latex',
+                                           extra_args=pdoc_args,
+                                           filters=filters)
+                    #return json.loads(output)['blocks']
+                    #return Para([[], json.loads(output)['blocks'], []])
+                    a =  [RawBlock("html", '<table><tr><td>')] + json.loads(output)['blocks'] + [RawBlock("html", '</td></tr></table>')]
+                    return a
+
+
+
 column = command_replace('column', replace='{{{name} width={body}}}')
-only = command_replace('only', replace='{{{name} slideno={body}}}')
+#only = command_replace('only', replace='{{{name} slideno={body}}}')
 onslide = command_replace('onslide', replace='{{{name} slideno={body}}}')
-overprint = environment_replace('overprint')
-columns = environment_replace('columns')
-frame = environment_replace('frame')
+
+env_replace = []
+env_replace.append({'name': 'overprint',
+                    'docstr': "Replace the overprint environment"})
+                    
+overprint = environment_replace('overprint', docstr="Replace the overprint environment")
+#columns = environment_replace('columns', docstr="Replace the columns environment")
+frame = environment_replace('frame', docstr="Replace the frame environment")
 widelist = environment_replace('widelist', template='\\begin{{description}}\n{body}\\end{{description}}')
-animateinline = environment_replace('animateinline')
+#animateinline = environment_replace('animateinline')
 includetalkfile = include_file('includetalkfile')
 includecvfile = include_file('includecvfile')
 
 def MakeUppercase(key, val, fmt,meta):
+    """Replace the MakeUppercase macro with the upper case text."""
     if key == 'RawInline':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\MakeUppercase", code):
@@ -176,6 +262,7 @@ def MakeUppercase(key, val, fmt,meta):
             return Str(M)
 
 def inputdiagram(key, val, fmt, meta):
+    """Convert an inputdiagram section to a image file for inclusion."""
     if key == 'RawInline':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\inputdiagram", code):
@@ -219,7 +306,7 @@ def octave(key, val, fmt, meta):
                 return CodeBlock(("mycode",["octave","numberLines"],[("startFrom","0")]),m)
 
 def tikz(key, val, fmt, meta):
-
+    """Convert a tikz file to an image for inclusion."""
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex":
