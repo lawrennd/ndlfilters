@@ -13,6 +13,13 @@ import pdb
 filters = ['../../../pandoc/python/myfilter.py']#, 'pandoc-citeproc']
 pdoc_args = ['--mathjax', '--smart', '--parse-raw']
 
+def latex(x):
+    return RawBlock('latex', x)
+
+
+def html(x):
+    return RawBlock('html', x)
+
 def decamel(name):
     """Remove camel case from a string"""
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
@@ -115,7 +122,6 @@ def include_file(name, ext='.tex', docstr=None):
                                   '--output=' + outputfile],
                                  stdout=sys.stderr)
                         return RawInline('tex', '#include ' + outputfile)
-                        #return Link(['', [], []], [Str(f)], [outputfile, ""])
     fun.__name__ = name
     if docstr is not None:
         fun.__doc__ = docstr
@@ -125,7 +131,7 @@ def include_file(name, ext='.tex', docstr=None):
 
                         
 def environment_replace(name,
-                        preamble='\input{notation_def.tex}',
+                        preamble='\\input{notation_def.tex}',
                         template='{preamble} {body}', docstr=None):
     """Process a latex environment."""
     def fun(key, val, fmt, meta):
@@ -143,7 +149,7 @@ def environment_replace(name,
                                                format='latex',
                                                extra_args=pdoc_args,
                                                filters=filters)
-                        return [RawBlock('html', '<!--{name} start-->'.format(name=name))] + json.loads(output)['blocks'] + [RawBlock('html', '<!--{name} end-->'.format(name=name))]
+                        return [html('<!--{name} start-->'.format(name=name))] + json.loads(output)['blocks'] + [html('<!--{name} end-->'.format(name=name))]
                     
                     
     fun.__name__ = name
@@ -188,13 +194,27 @@ def only(key, val, fmt, meta):
                     number = m.group(1)
                     environment_text = '\input{{notation_def}}\n\n{body}'.format(body=body)
                     sys.stderr.write(environment_text)
+                    f = open('tmp.tmp', 'w')
+                    f.write(environment_text)
+                    f.close()
                     output=pd.convert_text(source=environment_text,
                                            to='json',
                                            format='latex',
                                            extra_args=pdoc_args,
                                            filters=filters)
-                    #return [RawInline('latex', 'only slideno={number}'.format(number=number))] + json.loads(output)
-                    return json.loads(output)
+                    f = open('tmp2.tmp', 'w')
+                    f.write(output)
+                    f.close()
+                    out = json.loads(output)['blocks']
+                    pre = [html('only sildeno={number}'.format(number=number))]
+                    f = open('tmp3.tmp', 'w')
+                    f.write(json.dumps(pre+out))
+                    f.close()
+                    
+                    if isinstance(out, list):
+                        return  RawInline('latex', Para(pre + out))
+                    else:
+                        return RawInline('latex', Para(pre + [out]))
             
 
 def animateinline(key, val, fmt, meta):
@@ -207,7 +227,7 @@ def animateinline(key, val, fmt, meta):
                 m = macro_pattern.match(code)
                 if m:
                     body = m.group(3)
-                    return RawBlock("latex", body)
+                    return latex(body)
 
 def columns(key, val, fmt, meta):
     """Replace Beamer columns with an html table"""
@@ -219,22 +239,24 @@ def columns(key, val, fmt, meta):
                 m = macro_pattern.match(code)
                 if m:
                     body = m.group(1)
-                    preamble = '\input{notation_def.tex}\n'
+                    preamble = '\\input{notation_def.tex}\n'
                     environment_text = '{preamble}{body}'.format(preamble=preamble, body=body)
                     output=pd.convert_text(source=environment_text,
                                            to='json',
                                            format='latex',
                                            extra_args=pdoc_args,
                                            filters=filters)
-                    #return json.loads(output)['blocks']
-                    #return Para([[], json.loads(output)['blocks'], []])
-                    a =  [RawBlock("html", '<table><tr><td>')] + json.loads(output)['blocks'] + [RawBlock("html", '</td></tr></table>')]
-                    return a
+                    out = json.loads(output)['blocks']
+                    pre = [html('<table><tr><td>')]
+                    post = [html('</td></tr></table>')]
+                    if isinstance(out, list):
+                        return  pre + out + post
+                    else:
+                        return pre + [out] + post
 
 
 
 column = command_replace('column', replace='{{{name} width={body}}}')
-#only = command_replace('only', replace='{{{name} slideno={body}}}')
 onslide = command_replace('onslide', replace='{{{name} slideno={body}}}')
 
 env_replace = []
@@ -242,10 +264,10 @@ env_replace.append({'name': 'overprint',
                     'docstr': "Replace the overprint environment"})
                     
 overprint = environment_replace('overprint', docstr="Replace the overprint environment")
-#columns = environment_replace('columns', docstr="Replace the columns environment")
+
 frame = environment_replace('frame', docstr="Replace the frame environment")
 widelist = environment_replace('widelist', template='\\begin{{description}}\n{body}\\end{{description}}')
-#animateinline = environment_replace('animateinline')
+
 includetalkfile = include_file('includetalkfile')
 includecvfile = include_file('includecvfile')
 

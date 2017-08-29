@@ -28,6 +28,9 @@ There was a cat, I like it.
                {'name': 'includecvfile',
                 'test_text': '''\\includecvfile{test_cv.tex}'''
                 },
+               {'name': 'inputdiagram',
+                'test_text': '''\\inputdiagram{test_diagram.tex}'''
+                },
                {'name': 'only',
                 'test_text': '''\\begin{frame}
 \\only<1>{This is the first frame}
