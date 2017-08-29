@@ -2,25 +2,25 @@
 % pandoc -R -f latex test.tex -F ../../../pandoc/python/myfilter.py -t markdown -o test.md
 
 \input{notation_def}
-\includetalkfile{../../../gplvm/tex/talks/variationalBayesGPLVM_long.tex}
-\includetalkfile{../../../gp/tex/talks/gpInterpolation.tex}
+\includetalkfile{../../../mlprojects/gplvm/tex/talks/variationalBayesGPLVM_long.tex}
+\includetalkfile{../../../mlprojects/gp/tex/talks/gpInterpolation.tex}
 \begin{octave}
   %}
   rbfcovarianceSample
   %{
 \end{octave}
 \begin{center}
-  \only<1>{\inputdiagram{../../../kern/tex/diagrams/rbfKernelImage}}\only<2>{\begin{animateinline}[autoplay,loop]{10}\input{../../../kern/tex/diagrams/rbfSampleIncludeText.tex}\end{animateinline}}
+  \begin{animateinline}[autoplay,loop]{10}$a=1$\newframe$a=2$\end{animateinline}
 \end{center}
 
 \only<1>{This is a test of only}
 
-\includecvfile{../../../../../lawrennd/cv/tex/parts/currentEmployment.tex}
-\includetalkfile{../../../gp/tex/talks/gpKalmanFilterKronecker.tex}
-\includetalkfile{../../../gp/tex/talks/gpGeneExpressionOptimizeExample.tex}
+\includecvfile{../../../cv/tex/parts/currentEmployment.tex}
+\includetalkfile{../../../mlprojects/gp/tex/talks/gpKalmanFilterKronecker.tex}
+\includetalkfile{../../../mlprojects/gp/tex/talks/gpGeneExpressionOptimizeExample.tex}
 
 \begin{frame}
-\href{http://www.biomedcentral.com/1471-2105/12/180}{\includegraphics[page=1, trim=0cm 14cm 0cm 0cm, clip=true, width=\textwidth]{../../../health/tex/diagrams/1471-2105-12-180.pdf}}
+\href{http://www.biomedcentral.com/1471-2105/12/180}{\includegraphics[page=1, trim=0cm 14cm 0cm 0cm, clip=true, width=\textwidth]{../../../mlprojects/health/tex/diagrams/1471-2105-12-180.pdf}}
 \end{frame}
 
 \begin{frame}

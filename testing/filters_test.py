@@ -8,11 +8,11 @@ path = os.path.dirname(os.path.realpath(__file__))
 filters = [os.path.join(path, '..', 'myfilter.py')]#, 'pandoc-citeproc']
 
 filter_test = [{'name': 'animateinline',
-              'test_text': '''\\begin{animateinline}[autoplay,loop]{10}
-\\includegraphics{test1.png}
+              'test_text': '''\\begin{{animateinline}}[autoplay,loop]{{10}}
+\\includegraphics{{{path}/test1.png}}
 \\newframe
-\\includegraphics{test2.png}
-\\end{animateinline}'''},
+\\includegraphics{{{path}/test2.png}}
+\\end{{animateinline}}'''.format(path=path)},
                {'name': 'columns',
                 'test_text': '''\\begin{columns}
 <!-- begin frame -->
@@ -26,13 +26,13 @@ There was a cat, I like it.
 \\end{itemize}
 \\end{frame}'''},
                {'name': 'includetalkfile',
-                'test_text': '''\\includetalkfile{test_talk.tex}'''
+                'test_text': '''\\includetalkfile{{{path}/test_talk.tex}}'''.format(path=path)
                 },
                {'name': 'includecvfile',
-                'test_text': '''\\includecvfile{test_cv.tex}'''
+                'test_text': '''\\includecvfile{{{path}/test_cv.tex}}'''.format(path=path)
                 },
                {'name': 'inputdiagram',
-                'test_text': '''\\inputdiagram{test_diagram.tex}'''
+                'test_text': '''\\inputdiagram{{{path}/test_diagram.tex}}'''.format(path=path)
                 },
                {'name': 'only',
                 'test_text': '''\\begin{frame}
