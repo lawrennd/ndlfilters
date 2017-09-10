@@ -2,16 +2,49 @@ import os
 import re
 import shutil
 import sys
-from subprocess import call
+from subprocess import check_output, CalledProcessError
 from tempfile import mkdtemp
-from pandocfilters import toJSONFilters, Para,RawBlock, RawInline, Plain, Image, get_filename4code, get_extension, walk, CodeBlock, Link, Str
+from pandocfilters import toJSONFilters, Para,RawBlock, RawInline, Plain, Image, get_filename4code, get_extension, walk, CodeBlock, Link, Str, Table, Math
 from caps import caps
 import pypandoc as pd
 import json
+from pathlib import Path
+import pdb
 
+from os.path import expanduser
+home = expanduser("~")
 path = os.path.dirname(os.path.realpath(__file__))
 filters = [os.path.join(path, 'myfilter.py')]#, 'pandoc-citeproc']
 pdoc_args = ['--mathjax', '--smart', '--parse-raw', '--atx-headers']
+
+
+def run_external_process(args):
+    try:
+        check_output(args) #, stdout=sys.stderr)
+    except CalledProcessError:
+        tb = traceback.format_exc()
+        tb = tb.replace(passwd, "******")
+        syst.stderr.write(tb)
+        exit(1)
+
+def dir_directory(home=home):
+    dir = os.getcwd()
+
+def isblock(type):
+    """Check if the input type is a block type."""
+    if type in ['Plain', 'Para', 'CodeBlock', 'RawBlock','BlockQuote',
+                'OrderedList','BulletList','DefinitionList','Header',
+                'HorizontalRule','Table','Div','Null']:
+        return True
+    elif type in ['Str','Emph','Strong','Strikeout','Superscript',
+                  'Subscript','SmallCaps','Quoted','Cite','Code','Space',
+                  'LineBreak','Math','RawInline','Link','Image','Note',
+                  'SoftBreak','Span']:
+        return False
+    else:
+        raise StandardError('Unknown Type')
+
+
 
 def latex(x):
     return RawBlock('latex', x)
@@ -63,34 +96,46 @@ def tikz2image(tikz_src, filetype, outfile):
     f.write(tikz_src)
     f.write("\n\\end{document}\n")
     f.close()
-    call(["pdflatex", 'tikz.tex'], stdout=sys.stderr)
+    run_external_process(["pdflatex", 'tikz.tex'])
+        
     os.chdir(olddir)
     if filetype == 'pdf':
         shutil.copyfile(tmpdir + '/tikz.pdf', outfile + '.pdf')
     else:
-        call(["convert", tmpdir + '/tikz.pdf', outfile + '.' + filetype])
+        run_external_process(["convert", tmpdir + '/tikz.pdf', outfile + '.' + filetype])
     shutil.rmtree(tmpdir)
 
-def latex2animation(tex_list, filetype, outfile, fps=24):
+def latex2animation(tex_list, outfile, fps=24, tmpdir=None):
     """Create an animation from a series of latex files."""
+    remove_temp = False
+    if tmpdir is None:
+        remove_temp=True
+        tmpdir = mkdtemp()
+    olddir = os.getcwd()
+    os.chdir(tmpdir)
     if not os.path.isfile(outfile):
         in_arg = []
         for i, body in enumerate(tex_list):
             interfile = 'animate' + str(i).zfill(4)
-            picture2image(body, 'png', interfile)
-            sys.stderr.write('Created image ' + interfile + '\n')
+            picture2image(body, 'png', os.path.join(tmpdir,interfile), tmpdir=tmpdir)
             in_arg.append('-delay')
             in_arg.append(str(1000/fps))
-            in_arg.append(interfile + '.png')
-        call(['convert'] + in_arg + ['-loop', '0', outfile])
+            in_arg.append(os.path.join(tmpdir,interfile) + '.png')
+        run_external_process(['convert'] + in_arg + ['-loop', '0', os.path.join(olddir,outfile)])
         sys.stderr.write('Created image ' + outfile + '\n')
+    if remove_temp:
+        shutil.rmtree(tmpdir)
+    os.chdir(olddir)
                     
-def picture2image(picture_src, filetype, outfile):
+def picture2image(picture_src, filetype, outfile, tmpdir=None):
     """Create an image from latex code that defines a picture."""
     tmpdir = '.'
-    #tmpdir = mkdtemp()
-    #olddir = os.getcwd()
-    #os.chdir(tmpdir)
+    remove_temp = False
+    if tmpdir is None:
+        remove_temp = True
+        tmpdir = mkdtemp()
+    olddir = os.getcwd()
+    os.chdir(tmpdir)
     f = open('picture.tex', 'w')
     f.write("""\\documentclass{standalone}
              \\standaloneconfig{crop=true}
@@ -104,13 +149,17 @@ def picture2image(picture_src, filetype, outfile):
     f.write("\n\\end{document}\n")
     f.close()
     sys.stderr.write(picture_src + '\n')
-    call(["pdflatex", 'picture.tex'], stdout=sys.stderr)
-    #os.chdir(olddir)
+    run_external_process(["pdflatex", 'picture.tex'])
+    os.chdir(olddir)
     if filetype == 'pdf':
-        shutil.copyfile(tmpdir + '/picture.pdf', outfile + '.pdf')
+        shutil.copyfile(os.path.join(tmpdir, 'picture.pdf'), outfile + '.pdf')
     else:
-        call(["convert", '-density', '150', tmpdir + '/picture.pdf', '-quality', '100', '-flatten', '-sharpen', '0x1.0', outfile + '.' + filetype])
-    #shutil.rmtree(tmpdir)
+        run_external_process(["convert", '-density', '150', os.path.join(tmpdir,'picture.pdf'), '-quality', '100', '-flatten', '-sharpen', '0x1.0', outfile + '.' + filetype])
+        run_external_process(["convert", '-negate', outfile + '.' + filetype, outfile + '_neg.' + filetype])
+        sys.stderr.write(outfile + filetype)
+        
+    #if remove_temp:
+        #shutil.rmtree(tmpdir)
 
 def get_file(fullfile):
     """Get a decamelled filename"""
@@ -122,6 +171,7 @@ def get_file(fullfile):
 def include_file(name, ext='.tex', docstr=None):
     """Deal with included files."""
     def fun(key, val, fmt, meta):
+        meta = extract_json_info(meta)
         if key == 'RawInline':
             [fmt, code] = val
             if fmt == "latex" and re.match(r"\\{name}".format(name=name), code):
@@ -139,14 +189,20 @@ def include_file(name, ext='.tex', docstr=None):
                         # Only write if it's not been written before!
                         if not os.path.isfile(outputfile):
                             # Call pandoc again on the included file
-                            output=pd.convert_file(body,
+                            olddir = os.getcwd()
+                            d = os.path.dirname(outputfile)
+                            os.chdir(d)
+                            fname = os.path.basename(outputfile)
+                            extra_args = pdoc_args + conv2meta_arg(meta)
+                            output=pd.convert_file(fname,
                                                    to='markdown',
                                                    format='latex',
-                                                   extra_args=pdoc_args,
+                                                   extra_args=extra_args,
                                                    filters=filters)
-                            f = open(outputfile, 'w')
+                            f = open(fname, 'w')
                             f.write(output)
-                            f.close()                            
+                            f.close()
+                            os.chdir(olddir)
                         return include(outputfile)
     fun.__name__ = name
     if docstr is not None:
@@ -161,6 +217,8 @@ def environment_replace(name,
                         template='{preamble} {body}', docstr=None):
     """Process a latex environment."""
     def fun(key, val, fmt, meta):
+        meta = extract_json_info(meta)
+        assert(isinstance(meta,dict))
         if key == 'RawBlock':
             [fmt, code] = val
             if fmt == "latex":
@@ -169,7 +227,7 @@ def environment_replace(name,
                     m = macro_pattern.match(code)
                     if m:
                         body = m.group(1)
-                        out = parse_to_json(body, preamble)
+                        out = parse_to_json(body, preamble, format=fmt, meta=meta)
                         return [html('<!--{name} start-->'.format(name=name))] +out + [html('<!--{name} end-->'.format(name=name))]
                     
                     
@@ -180,9 +238,25 @@ def environment_replace(name,
         fun.__doc__ = "Process the " + name + " environment."
     return fun
 
+def meta_data(key, val, fmt, meta):
+    """Write down a key from the meta information as a json str. Mainly for debugging"""
+    meta = extract_json_info(meta)
+    if key == 'RawInline':
+        [fmt, code] = val
+        if fmt == "latex":
+            if re.match(r"\\metaData", code):
+                macro_pattern = re.compile(r"""\\metaData{(.*)}""", re.DOTALL)
+                m = macro_pattern.match(code)
+                if m:
+                    if m.group(1) in meta:
+                        return Str('metadata:' + m.group(1) + '=' + json.dumps(meta[m.group(1)]))
+                    else: 
+                        return Str('metadata: ' + m.group(1) + ' not found. Keys are ' + str(meta.keys()))
+
 def command_replace(name, replace='{name} {body}', docstr=None):
     """Process a latex command."""
     def fun(key, val, fmt, meta):
+        meta = extract_json_info(meta)
         if key == 'RawInline':
             [fmt, code] = val
             if fmt == "latex":
@@ -240,6 +314,7 @@ def command_replace(name, replace='{name} {body}', docstr=None):
 
 def animateinline(key, val, fmt, meta):
     """Handle the animateinline environment making a gif file"""
+    meta = extract_json_info(meta)
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex":
@@ -248,42 +323,173 @@ def animateinline(key, val, fmt, meta):
                 m = macro_pattern.match(code)
                 if m:
                     body_parts = m.group(3).split('\\newframe')
-                    filetype = get_extension(format, "png", html="png", latex="pdf")
-                    outfile = 'myfile.gif'
-                    latex2animation(body_parts, filetype, outfile)
+                    outfile = 'cat.gif'
+                    if os.path.isdir('../diagrams'):
+                        outfile = os.path.join('../diagrams', outfile)
+                    latex2animation(body_parts, outfile)
                     return Para([Image(['', [], []], [], [outfile, ""])])
 
-def columns(key, val, fmt, meta):
+def columns(key, val, fmt, meta={}):
     """Replace Beamer columns with an html table"""
+    meta = extract_json_info(meta)
+    def get_align(val):
+        if val is None:
+            return 'AlignLeft'
+        elif val == 'c':
+            return 'AlignCenter'
+        elif val == 't':
+            return 'AlignLeft'
+        elif val == 'r':
+            return 'AlignRight'
+
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex":
             if re.match(r"\\begin{columns}", code):
-                macro_pattern = re.compile(r"""\\begin{columns}\[?([^\]]*)\]?(.*)\\end{columns}""", re.DOTALL)
+                macro_pattern = re.compile(r"""\\begin{columns}(.*)\\end{columns}""", re.DOTALL)
                 m = macro_pattern.match(code)
+                def_align = get_align(None)
+                width = None
                 if m:
-                    body = m.group(2)
-                    preamble = '\\input{notation_def.tex}\n'
-                    out = parse_to_json(body, preamble)
-                    pre = [html('<table><tr><td>')]
-                    post = [html('</td></tr></table>')]
-                    if isinstance(out, list):
-                        return  pre + out + post
-                    else:
-                        return pre + [out] + post
+                    body = m.group(1)
+                    macro_pattern = re.compile(r"""^\[([^\]]*)\](.*)""", re.DOTALL)
+                    m = macro_pattern.match(body)
+                    if m:
+                        body = m.group(2)
+                        def_align = get_align(m.group(1))
 
-def parse_to_json(body, preamble=None):
+                    macro_pattern = re.compile(r"""^{([^}]*)}(.*)""", re.DOTALL)
+                    m = macro_pattern.match(body)
+                    if m:
+                        body = m.group(2)
+                        width = m.group(1)
+                            
+                    preamble = '\\input{notation_def.tex}\n'
+                    out = parse_to_json(body, preamble, format=fmt, meta=meta)
+                    cols = []
+                    widths = []
+                    col = []
+                    def extract_col(ent, col, cols):
+                        key = ent['t']
+                        if 'c' in ent:
+                            val = ent['c']
+                        if key == 'Para':
+                            for e in val:
+                                col, cols = extract_col(e, col, cols)
+                            return col, cols
+                        elif key == 'RawInline':
+                            [fmt, code] = val
+                            if fmt == "latex":
+                                if re.match(r"\\column", code):
+                                    macro_pattern = re.compile(r"""\[([^\]]*)\]""", re.DOTALL)
+                                    m = macro_pattern.match(code)
+                                    if m:
+                                        align = get_align(m.group(1))
+                                    else:
+                                        align = def_align
+                                    macro_pattern = re.compile(r"""{([^}]*)}""", re.DOTALL)
+                                    m = macro_pattern.match(code)
+                                    if m:
+                                        width = m.group(1)
+                                    else:
+                                        width = None
+
+                                    cols.append([{'c': col, 't': 'Plain'}])
+                                    col = []
+                                    return col, cols
+
+                        elif key == 'RawBlock':
+                            [fmt, code] = val
+                            if fmt == "latex":
+                                if re.match(r"\\begin{column}", code):
+                                    macro_pattern = re.compile(r"""\\begin{column}(.*)\\end{column}""", re.DOTALL)
+                                    m = macro_pattern.match(code)
+                                    align = def_align
+                                    if m:
+                                        body = m.group(1)
+                                        macro_pattern = re.compile(r"""^\[([^\]]*)\](.*)""", re.DOTALL)
+                                        m = macro_pattern.match(body)
+                                        if m:
+                                            body = m.group(2)
+                                            align = get_align(m.group(1))
+
+                                        macro_pattern = re.compile(r"""^{([^}]*)}(.*)""", re.DOTALL)
+                                        m = macro_pattern.match(body)
+                                        if m:
+                                            body = m.group(2)
+                                            width = m.group(1)
+                                        preamble = '\\input{notation_def.tex}\n'
+                                        out = parse_to_json(body, preamble, format=fmt, meta=meta)
+                                        cols.append(out)
+                                        col = []
+                                        return col, cols
+                                                    
+
+                        col.append(ent)
+                        return col, cols
+                                
+                    for ent in out:
+                        col, cols = extract_col(ent, col, cols)
+                    cols.append([{'c': col, 't': 'Plain'}])
+                    
+                    num_cols = len(cols)
+                    align = [{'t': 'AlignCenter'}]*num_cols
+                    maybe_width = widths
+                    cor = [[]]*num_cols
+                    return Table([],align,[],cor,[cols])
+                
+def conv2metajson_arg(meta):
+    """Convert meta cell information to a single json argument for passing as meta information."""
+    json_str = json.dumps(meta)
+    json_arg = ['--metadata=metajson:' + json_str]
+    return json_arg
+
+def extract_json_info(meta):
+    """Extract meta information structure from metajson argument."""
+    return meta
+    assert(meta is None or isinstance(meta, dict))
+    if 'metajson' in meta:
+        if meta['metajson']['t'] == 'MetaString':
+            json_info = json.loads(meta['metajson']['c'])
+            if isinstance(json_info, dict):
+                #del(meta['metajson'])
+                for key, val in json_info.items():
+                    meta[key] = val
+                return meta
+            else:
+                raise TypeError("Error metajson is not a dict, metajson:" + str(json_info))
+        else:
+            raise TypeError("Incorrect format for metajson")
+    else:
+        return meta
+
+def parse_to_json(body, preamble=None, format='latex', meta={}):
     """Parse text of body to a json representation"""
     environment_text = '{preamble}{body}'.format(preamble=preamble, body=body)
+    if not isinstance(meta, dict):
+        raise TypeError('meta information should be a dict')
+    
+    extra_args = pdoc_args + conv2metajson_arg(meta)
     output=pd.convert_text(source=environment_text,
                            to='json',
-                           format='latex',
-                           extra_args=pdoc_args,
+                           format=format,
+                           extra_args=extra_args,
                            filters=filters)
     return json.loads(output)['blocks']
 
+def json_to_output(obj, to='markdown', meta={}):
+    """Convert json structure to a given output."""
+    extra_args = pdoc_args
+    source = {'blocks': obj, "pandoc-api-version":[1,17,0,5], 'meta': meta}
+    return pd.convert_text(source=json.dumps(source),
+                           to=to,
+                           format='json',
+                           extra_args=extra_args,
+                           filters=filters)
+
 def frame(key, val, fmt, meta):
     """Replace Beamer frame with reveal frame"""
+    meta = extract_json_info(meta)
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex":
@@ -293,7 +499,7 @@ def frame(key, val, fmt, meta):
                 if m:
                     body = m.group(2)
                     preamble = '\\input{notation_def.tex}\n'
-                    out = parse_to_json(body, preamble)
+                    out = parse_to_json(body, preamble, format=fmt, meta=meta)
                     pre = [html('<!-- begin frame -->')]
                     post = [html('<!-- end frame -->')]
                     if isinstance(out, list):
@@ -302,8 +508,22 @@ def frame(key, val, fmt, meta):
                         return pre + [out] + post
 
 
+# def column(key, val, fmt, meta):
+#     """Convert column command into relevant table command."""
+#     meta = extract_json_info(meta)
+#     if key == 'RawInline':
+#         [fmt, code] = val
+#         if fmt == "latex":
+#             if re.match(r"\\column", code):
+#                 macro_pattern = re.compile(r"""\\column{(.*)}""", re.DOTALL)
+#                 m = macro_pattern.match(code)
+#                 if m:
+#                     width = m.group(1)
+#                     return RawInline('html', '<td width="{width}">'.format(width=width))
+#                 else:
+#                     return RawInline('html', '<td>')
 
-column = command_replace('column', replace='{{{name} width={body}}}')
+#column = command_replace('column', replace='<td width={body}>')
 only = command_replace('only', replace='{{{name} width={body}}}')
 onslide = command_replace('onslide', replace='{{{name} slideno={body}}}')
 
@@ -319,31 +539,36 @@ widelist = environment_replace('widelist', template='\\begin{{description}}\n{bo
 includetalkfile = include_file('includetalkfile')
 includecvfile = include_file('includecvfile')
 
-def MakeUppercase(key, val, fmt,meta):
+def makeuppercase(key, val, fmt, meta):
     """Replace the MakeUppercase macro with the upper case text."""
-    if key == 'RawInline':
+    meta = extract_json_info(meta)
+    if key == 'Math':
+        sys.stderr.write(str(val))
         [fmt, code] = val
-        if fmt == "latex" and re.match(r"\\MakeUppercase", code):
-            sys.stderr.write('Whoop3')
-            match_macro = re.compile(r"""\\MakeUppercase\{(.*)\}""")
-            macro_match = match_macro.findall(code)
+        if re.match(r"\\MakeUppercase", code):
+            match_pattern = re.compile(r"""\\MakeUppercase{([^}]*)}""")
+            macro_match = match_pattern.findall(code)
             for m in macro_match:
-                M = caps(val, fmt, meta)
-            return Str(M)
+                sys
+                M = m.upper()
+                code=code.replace('\\MakeUppercase{'+m+'}', '{' + M + '}')
+            return Math(fmt, code)
 
 def inputdiagram(key, val, fmt, meta):
     """Convert an inputdiagram section to a image file for inclusion."""
+    meta = extract_json_info(meta)
     if key == 'RawInline':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\inputdiagram", code):
             #outfile = get_filename4code("inputdiagram", code)
-            match_macro = re.compile(r"""\\inputdiagram\{(.*)\}""")
+            match_macro = re.compile(r"""\\inputdiagram{(.*)}""")
             macro_match = match_macro.findall(code)
             for m in macro_match:
                 fullfile = m
                 outfile = get_file(fullfile)
                 filetype = get_extension(format, "png", html="png", latex="pdf")
                 src = outfile + '.' + filetype
+                
                 if not os.path.isfile(src):
                     picture2image(code, filetype, outfile)
                     sys.stderr.write('Created image ' + src + '\n')
@@ -351,6 +576,7 @@ def inputdiagram(key, val, fmt, meta):
 
 def overlay(key, value, fmt, meta):
     "From https://andrewgoldstone.com/blog/2014/12/24/slides/"
+    meta = extract_json_info(meta)
     if key == 'RawInline' and value[0] == 'tex':
         m = ov_pat.match(value[1])
         if m:
@@ -362,6 +588,7 @@ def overlay(key, value, fmt, meta):
                 
 def octave(key, val, fmt, meta):
     """Write an octave block to a new file."""
+    meta = extract_json_info(meta)
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex" and re.match(r"\\begin{octave}", code):
@@ -377,6 +604,7 @@ def octave(key, val, fmt, meta):
 
 def tikz(key, val, fmt, meta):
     """Convert a tikz file to an image for inclusion."""
+    meta = extract_json_info(meta)
     if key == 'RawBlock':
         [fmt, code] = val
         if fmt == "latex":
@@ -389,3 +617,36 @@ def tikz(key, val, fmt, meta):
                     sys.stderr.write('Created image ' + src + '\n')
                 return Para([Image(['', [], []], [], [src, ""])])
 
+
+def write_notation():
+    """Load in notation and write it out as a latex file."""
+    import yaml
+    import collections
+    # Require an ordered dict for the yaml file https://stackoverflow.com/questions/5121931/in-python-how-can-you-load-yaml-mappings-as-ordereddicts
+    _mapping_tag = yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG
+
+    def dict_representer(dumper, data):
+        return dumper.represent_dict(data.items())
+
+    def dict_constructor(loader, node):
+        return collections.OrderedDict(loader.construct_pairs(node))
+
+    yaml.add_representer(collections.OrderedDict, dict_representer)
+    yaml.add_constructor(_mapping_tag, dict_constructor)
+
+    f = open('notation_def.yml', 'r')
+    notation = yaml.load(f)
+    f.close()
+    f = open('notation_def.tex', 'w')
+    for key, val in notation.items():
+        i = 1
+        num = 0
+        while(val['latex'].find('#'+str(i))>0):
+            num+=1
+            i+=1
+        if num>0:
+            f.write('\\newcommand{{\\{key}}}[{num}]{{{latex}}}\n'.format(num=num, key=key, latex=val['latex']))
+        else:
+            f.write('\\newcommand{{\\{key}}}{{{latex}}}\n'.format(key=key, latex=val['latex']))
+    f.close()
+    
